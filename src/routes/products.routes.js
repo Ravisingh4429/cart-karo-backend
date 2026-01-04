@@ -139,5 +139,44 @@ proutes.put("/:id", auth, role, async (req, res) => {
 });
 
 //feature product
+proutes.get("/featured", async (req, res) => {
+  try {
+    const featureProducts = await products
+      .find()
+      .sort({ createdAt: -1 })
+      .select("title price reviews")
+      .limit(3);
+    if (featureProducts.length === 0) {
+      return res.status(404).json({ message: "no products found in db" });
+    }
+    res.status(200).json({ featureProducts });
+  } catch (error) {
+    return res.status(500).json({ message: "internal server error" });
+  }
+});
 //searchproduct
+proutes.get("/search", async (req, res) => {
+  try {
+    const query = req.query.search;
+    if (!query) {
+      return res.status(400).json({ message: "Enter any value to search" });
+    }
+    const searchValue = await products
+      .find({
+        $or: [
+          { title: { $regex: query, $options: "i" } },
+          { descriptions: { $regex: query, $options: "i" } },
+        ],
+      })
+      .select("title price reviews")
+      .sort({ price: 1 })
+      .limit(10);
+    if (searchValue.length === 0) {
+      return res.status(404).json({ message: "No data Found" });
+    }
+    res.status(200).json({ searchValue });
+  } catch (error) {
+    return res.status(500).json({ message: "internal server error" });
+  }
+});
 module.exports = proutes;
