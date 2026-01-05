@@ -92,5 +92,93 @@ routes.post("/", auth, async (req, res) => {
 });
 
 // decrease one item
+routes.patch("/decrease/:id", auth, async (req, res) => {
+  try {
+    const productId = req.params.id;
+
+    // cart find
+    const checkCart = await cart.findOne({ user: req.user._id });
+    if (!checkCart) {
+      return res.status(404).json({ message: "Empty Cart" });
+    }
+    // product find in cart
+    const productIndex = checkCart.products.findIndex((item) =>
+      item.product.equals(productId)
+    );
+
+    // decrease
+    if (productIndex === -1) {
+      return res.status(400).json({ message: "Product not found" });
+    }
+
+    const existQuantity = checkCart.products[productIndex].quantity;
+    if (existQuantity > 1) {
+      checkCart.products[productIndex].quantity = existQuantity - 1;
+    } else {
+      checkCart.products.splice(productIndex, 1);
+      if (checkCart.products.length === 0) {
+        await cart.findByIdAndDelete({ _id: checkCart._id });
+        return res.status(404).json({ message: "Cart is Empty" });
+      }
+    }
+    // update cart price
+    let total = 0;
+    for (let element of checkCart.products) {
+      const prod = await product.findById(element.product);
+      total += element.quantity * prod.price;
+    }
+    checkCart.totalvalue = total;
+    // save
+    await checkCart.save();
+    res.status(200).json({ checkCart });
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 // increase one item
+routes.patch("/increse/:id", auth, async (req, res) => {
+  try {
+    const productId = req.params.id;
+    const productfind = await product.findOne({ _id: productId });
+    if (!productfind) {
+      return res.status(404).json({ message: "No Product found" });
+    }
+    // cart find
+    const checkCart = await cart.findOne({ user: req.user._id });
+    if (!checkCart) {
+      return res.status(404).json({ message: "Empty Cart" });
+    }
+    // product find in cart
+    const productIndex = checkCart.products.findIndex(
+      (item) => item.product.toString() === productId
+    );
+
+    // increase
+    if (productIndex === -1) {
+      return res.status(400).json({ message: "Product not found" });
+    }
+    const existQuantity = checkCart.products[productIndex].quantity;
+    const totalQuantity = existQuantity + 1;
+    if (totalQuantity > productfind.stock) {
+      return res.status(400).json({
+        message: `only ${productfind.stock - existQuantity} available in stock`,
+      });
+    }
+    checkCart.products[productIndex].quantity = totalQuantity;
+    // update cart price
+    let total = 0;
+    for (let element of checkCart.products) {
+      const prod = await product.findById(element.product);
+      total += element.quantity * prod.price;
+    }
+    checkCart.totalvalue = total;
+    // save
+    await checkCart.save();
+    res.status(200).json({ checkCart });
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 module.exports = routes;
