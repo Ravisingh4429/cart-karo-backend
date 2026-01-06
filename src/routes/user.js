@@ -1,15 +1,47 @@
 const routes = require("express").Router();
 const bcrypt = require("bcrypt");
+const multer = require("multer");
 const jwt = require("jsonwebtoken");
 const userJoi = require("../vaildations/userJoi");
 const user = require("../model/user");
 const auth = require("../middleware/auth");
 
 // signup
-routes.post("/signup", async (req, res) => {
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "upload/profile/");
+  },
+  filename: (req, file, cb) => {
+    const timestamps = Date.now();
+    const origanilname = file.originalname
+      .replace(/\s+/g, "-")
+      .replace(/[^a-zA-Z0-9.-]/g, "");
+    cb(null, `${timestamps}-${origanilname}`);
+  },
+});
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Invalid file type only jpeg,png,gif allowed", false));
+  }
+};
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 2 * 1024 * 1024,
+  },
+});
+routes.post("/signup", upload.single("profilePic"), async (req, res) => {
   try {
     const { name, email, password, daddress } = req.body;
-    const userInputValid = userJoi.validate(req.body);
+    const image = req.file.filename;
+    const { error, value } = userJoi.validate(req.body);
+    if (error) {
+      return res.status(400).json({ message: error.message });
+    }
     const checkUserAlready = await user.findOne({
       email,
     });
@@ -23,6 +55,7 @@ routes.post("/signup", async (req, res) => {
       email,
       password: hashPassword,
       daddress,
+      profilePic: image,
     });
     await userNew.save();
     res.status(201).json({ message: "user register" });

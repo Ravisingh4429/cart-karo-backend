@@ -1,53 +1,93 @@
 const proutes = require("express").Router();
 const products = require("../model/product");
 const category = require("../model/category");
+const multer = require("multer");
 const auth = require("../middleware/auth");
 const role = require("../middleware/rolecheck");
 const productJoi = require("../vaildations/productJoi");
 const productUpdateJoi = require("../vaildations/productUpdateJoi");
-// create
-proutes.post("/create", auth, role, async (req, res) => {
-  if (!req.body) {
-    return res.status(400).json({ message: "Please pass data" });
-  }
-  // valid the input
-  const productJoiValidate = productJoi.validate(req.body);
-  if (productJoiValidate.error) {
-    return res.status(400).json(productJoiValidate.error.message);
-  }
-  // checking category
-  const checkCategory = await category.findById({
-    _id: productJoiValidate.value.category,
-  });
-  if (!checkCategory) {
-    return res
-      .status(404)
-      .json({ message: "This category is not present in databases" });
-  }
-  // checking product in db
-  const checkProduct = await products.findOne({
-    title: productJoiValidate.value.title,
-    category: productJoiValidate.value.category,
-  });
-  if (checkProduct) {
-    return res
-      .status(400)
-      .json({ message: "This product already there in this category" });
-  }
-  // adding in db
-  const newProduct = new products({
-    title: productJoiValidate.value.title,
-    price: productJoiValidate.value.price,
-    stock: productJoiValidate.value.stock,
-    descriptions: productJoiValidate.value.descriptions,
-    category: productJoiValidate.value.category,
-  });
-  await newProduct.save();
 
-  res
-    .status(201)
-    .json({ message: "New Product Added successfully", newProduct });
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "upload/products");
+  },
+  filename: (req, file, cb) => {
+    const timestamps = Date.now();
+    const origanilname = file.originalname
+      .replace(/\s+/g, "-")
+      .replace(/[^a-zA-Z0-9.-]/g, "");
+    cb(null, `${timestamps}-${origanilname}`);
+  },
 });
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = ["image/jpeg", "image/png", "image/gif"];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only jpeg, png, gif images are allowed"));
+  }
+};
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 2 * 1024 * 1024,
+  },
+});
+// create
+proutes.post(
+  "/create",
+  auth,
+  role,
+  upload.array("products", 5),
+  async (req, res) => {
+    const productimage = req.files.map((image) => image.filename);
+    if (productimage.length === 0) {
+      return res.status(400).json({ message: "Atlist one image is required" });
+    }
+    if (!req.body) {
+      return res.status(400).json({ message: "Please pass data" });
+    }
+    // valid the input
+    const productJoiValidate = productJoi.validate(req.body);
+    if (productJoiValidate.error) {
+      return res.status(400).json(productJoiValidate.error.message);
+    }
+    // checking category
+    const checkCategory = await category.findById({
+      _id: productJoiValidate.value.category,
+    });
+    if (!checkCategory) {
+      return res
+        .status(404)
+        .json({ message: "This category is not present in databases" });
+    }
+    // checking product in db
+    const checkProduct = await products.findOne({
+      title: productJoiValidate.value.title,
+      category: productJoiValidate.value.category,
+    });
+    if (checkProduct) {
+      return res
+        .status(400)
+        .json({ message: "This product already there in this category" });
+    }
+    // adding in db
+    const newProduct = new products({
+      title: productJoiValidate.value.title,
+      price: productJoiValidate.value.price,
+      stock: productJoiValidate.value.stock,
+      descriptions: productJoiValidate.value.descriptions,
+      category: productJoiValidate.value.category,
+      images: productimage,
+    });
+    await newProduct.save();
+
+    res
+      .status(201)
+      .json({ message: "New Product Added successfully", newProduct });
+  }
+);
 
 //display
 proutes.get("/display", async (req, res) => {

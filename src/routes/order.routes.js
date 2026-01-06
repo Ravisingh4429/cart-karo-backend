@@ -4,6 +4,7 @@ const order = require("../model/order");
 const cart = require("../model/cart");
 const product = require("../model/product");
 const auth = require("../middleware/auth");
+const rolecheck = require("../middleware/rolecheck");
 routes.get("/all", auth, async (req, res) => {
   try {
     let { page = 1, limit = 5 } = req.query;
@@ -54,7 +55,7 @@ routes.post("/create", auth, async (req, res) => {
       paymentStatus = "Paid";
     }
     const newOrder = new order({
-      user: findCart.user,
+      user: req.user._id,
       products: findCart.products.map((item) => ({
         product: item.product._id,
         quantity: item.quantity,
@@ -79,18 +80,51 @@ routes.post("/create", auth, async (req, res) => {
 });
 
 // single order
+routes.get("/:id", auth, async (req, res) => {
+  try {
+    const orderID = req.params.id;
+    const findOrder = await order
+      .findById({ _id: orderID, user: req.user._id })
+      .populate("products.product");
+    if (!findOrder) {
+      return res
+        .status(404)
+        .json({ message: "Invalid Order Id no order found" });
+    }
+    res.status(200).json({ findOrder });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+});
 
-routes.get("/order/:id", auth, async (req, res) => {
-  const orderID = req.params.id;
-  if (!orderID) {
-    return res.status(400).json({ message: "Please Enter Order Id" });
+// order status update by admin
+routes.patch("/status/:orderID", auth, rolecheck, async (req, res) => {
+  try {
+    const { orderStatus } = req.body;
+    if (
+      !["placed", "confirm", "shipped", "delivered", "cancelled"].includes(
+        orderStatus
+      )
+    ) {
+      return res.status(400).json({
+        message:
+          "Order Status Only be placed, confirm,shipped,delivered,cancelled",
+      });
+    }
+    const orderID = req.params.orderID;
+    const findOrder = await order.findById({
+      _id: orderID,
+    });
+    if (!findOrder) {
+      return res
+        .status(404)
+        .json({ message: "Invalid Order Id no order found" });
+    }
+    findOrder.orderStatus = orderStatus;
+    await findOrder.save();
+    return res.status(200).json({ message: "Order Status Updated", findOrder });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal Server Error" });
   }
-  const findOrder = await order
-    .findById({ _id: orderID })
-    .populate("products.product");
-  if (!findOrder) {
-    return res.status(400).json({ message: "Invalid Order Id no order found" });
-  }
-  res.status(200).json({ findOrder });
 });
 module.exports = routes;

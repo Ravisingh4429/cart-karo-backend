@@ -31,7 +31,7 @@ catRoutes.get("/display", async (req, res) => {
   if (!allCategory) {
     return res.status(404).json({ message: "no Category found" });
   }
-  res.status(200).json({ allCategory });
+  res.status(200).json(allCategory);
 });
 
 module.exports = catRoutes;

@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const app = express();
+const cors = require("cors");
 const mongoose = require("./src/DB/database");
 const user = require("./src/routes/user");
 const categoryRoutes = require("./src/routes/category.routes");
@@ -11,6 +12,8 @@ mongoose;
 
 //middleware
 app.use(express.json());
+app.use(cors());
+app.use("/products", express.static(__dirname + "/upload/products"));
 
 // all routes
 app.use("/api/user", user);
