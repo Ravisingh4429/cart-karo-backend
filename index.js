@@ -1,5 +1,7 @@
 require("dotenv").config();
 const express = require("express");
+const path = require("path");
+
 const app = express();
 const cors = require("cors");
 const mongoose = require("./src/DB/database");
@@ -13,7 +15,10 @@ mongoose;
 //middleware
 app.use(express.json());
 app.use(cors());
-app.use("/products", express.static(__dirname + "/upload/products"));
+app.use(
+  "/products",
+  express.static(path.join(__dirname, "src/upload/products"))
+);
 
 // all routes
 app.use("/api/user", user);

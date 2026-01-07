@@ -91,22 +91,63 @@ proutes.post(
 
 //display
 proutes.get("/display", async (req, res) => {
-  let { page = 1, limit = 10 } = req.query;
-  page = parseInt(page);
-  limit = parseInt(limit);
-  const fetchAllProducts = await products
-    .find()
-    .populate("category", "name")
-    .skip((page - 1) * limit)
-    .limit(limit);
-  if (!fetchAllProducts) {
-    return res.status(404).json({ message: "No Products found in database" });
+  const page = parseInt(req.query.page) || 1;
+  const perPage = parseInt(req.query.perPage) || 8;
+  const startIndex = (page - 1) * perPage;
+  const queryCategory = req.query.category || null;
+  const querySearch = req.query.search || null;
+
+  try {
+    let query = {};
+
+    if (queryCategory) {
+      const categoryfind = await category
+        .findOne({
+          name: queryCategory,
+        })
+        .exec();
+
+      if (!categoryfind) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+
+      query.category = categoryfind._id;
+    }
+
+    if (querySearch) {
+      query.title = { $regex: querySearch, $options: "i" };
+    }
+
+    const productsfind = await products
+      .find(query, {
+        _id: 1,
+        title: 1,
+        price: 1,
+        images: 1,
+        reviews: 1,
+        stock: 1,
+      })
+      .skip(startIndex)
+      .limit(perPage);
+
+    const totalProducts = (await products.countDocuments(query)) || 2;
+    const totalPages = Math.ceil(totalProducts / perPage);
+
+    return res.json({
+      products: productsfind,
+      currentPage: page,
+      postPerPage: perPage,
+      totalProducts,
+      totalPages,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server Error" });
   }
-  res.status(200).json(fetchAllProducts);
 });
 
 //display single product
-proutes.get("/:id/product", async (req, res) => {
+proutes.get("/product/:id", async (req, res) => {
   const pid = req.params.id;
   const findSingleProduct = await products
     .findById({ _id: pid })
@@ -114,7 +155,7 @@ proutes.get("/:id/product", async (req, res) => {
   if (!findSingleProduct) {
     return res.status(400).json({ message: "Invalid Product id" });
   }
-  res.status(200).json({ findSingleProduct });
+  res.status(200).json(findSingleProduct);
 });
 
 // delete

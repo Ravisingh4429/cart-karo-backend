@@ -9,7 +9,7 @@ const auth = require("../middleware/auth");
 // signup
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "upload/profile/");
+    cb(null, "upload/profiles/");
   },
   filename: (req, file, cb) => {
     const timestamps = Date.now();
@@ -36,7 +36,7 @@ const upload = multer({
 });
 routes.post("/signup", upload.single("profilePic"), async (req, res) => {
   try {
-    const { name, email, password, daddress } = req.body;
+    const { name, email, password, address } = req.body;
     const image = req.file.filename;
     const { error, value } = userJoi.validate(req.body);
     if (error) {
@@ -54,46 +54,44 @@ routes.post("/signup", upload.single("profilePic"), async (req, res) => {
       name,
       email,
       password: hashPassword,
-      daddress,
+      address,
       profilePic: image,
     });
     await userNew.save();
     res.status(201).json({ message: "user register" });
   } catch (error) {
-    res.json("internal server error");
+    res.status(500).json({ message: "Internal server error" });
   }
 });
 
 // login
 
 routes.post("/login", async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res
-        .status(400)
-        .json({ message: "Email and password are required" });
-    }
-    const checkUser = await user.findOne({ email });
-    if (!checkUser) {
-      return res.status(404).json({ message: "no user found with this email" });
-    }
-    const decpass = await bcrypt.compare(password, checkUser.password);
-    if (!decpass) {
-      return res.status(400).json({ message: "password is incorrect" });
-    }
-    const data = {
-      _id: checkUser._id,
-      name: checkUser.name,
-      email: checkUser.email,
-      daddress: checkUser.daddress,
-      isAdmin: checkUser.isAdmin,
-    };
-    const token = jwtGenerate(data);
-    res.json(token);
-  } catch (error) {
-    res.json({ message: "internal server error" });
+  // try {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ message: "Email and password are required" });
   }
+  const checkUser = await user.findOne({ email });
+  if (!checkUser) {
+    return res.status(404).json({ message: "no user found with this email" });
+  }
+  const decpass = await bcrypt.compare(password, checkUser.password);
+  if (!decpass) {
+    return res.status(400).json({ message: "password is incorrect" });
+  }
+  const data = {
+    _id: checkUser._id,
+    name: checkUser.name,
+    email: checkUser.email,
+    daddress: checkUser.daddress,
+    isAdmin: checkUser.isAdmin,
+  };
+  const token = jwtGenerate(data);
+  res.json(token);
+  // } catch (error) {
+  //   res.json({ message: "internal server error" });
+  // }
 });
 
 // particluar user
